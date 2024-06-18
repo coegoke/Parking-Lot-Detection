@@ -1,40 +1,42 @@
+import random
 import cv2
 import numpy as np
+from util import get_parking_spots_bboxes, empty_or_not, calc_diff, get_video_and_mask
 
-from util import get_parking_spots_bboxes, empty_or_not
+mask_path, video_path = get_video_and_mask()
 
-
-def calc_diff(im1, im2):
-    return np.abs(np.mean(im1) - np.mean(im2))
-
-
-mask = 'mask_convert.png'
-video_path = 'data/sourcevid3.mp4'
-mask = cv2.imread(mask, 0)
-
+mask = cv2.imread(mask_path, 0)
 cap = cv2.VideoCapture(video_path)
 
-connected_components = cv2.connectedComponentsWithStats(mask, 4, cv2.CV_32S)
+ret, frame = cap.read()
+if not ret:
+    print("Failed to read the video")
+    exit(1)
 
+mask_resized = cv2.resize(
+    mask, (frame.shape[1], frame.shape[0]), interpolation=cv2.INTER_NEAREST)
+
+connected_components = cv2.connectedComponentsWithStats(
+    mask_resized, 4, cv2.CV_32S)
 spots = get_parking_spots_bboxes(connected_components)
 
-spots_status = [None for j in spots]
-diffs = [None for j in spots]
+spots_status = [None for _ in spots]
+diffs = [None for _ in spots]
+scores = [None for _ in spots]  # To store the static scores for each spot
 
 previous_frame = None
-
 frame_nmr = 0
-ret = True
-step = 15
-while ret:
+step = 30
+
+while cap.isOpened():
     ret, frame = cap.read()
+    if not ret:
+        break
 
     if frame_nmr % step == 0 and previous_frame is not None:
         for spot_indx, spot in enumerate(spots):
             x1, y1, w, h = spot
-
             spot_crop = frame[y1:y1 + h, x1:x1 + w, :]
-
             diffs[spot_indx] = calc_diff(
                 spot_crop, previous_frame[y1:y1 + h, x1:x1 + w, :])
 
@@ -49,29 +51,38 @@ while ret:
         for spot_indx in arr_:
             spot = spots[spot_indx]
             x1, y1, w, h = spot
-
             spot_crop = frame[y1:y1 + h, x1:x1 + w, :]
-
             spot_status = empty_or_not(spot_crop)
 
-            spots_status[spot_indx] = spot_status
+            # Update the score only if the spot status changes
+            if spots_status[spot_indx] != spot_status:
+                spots_status[spot_indx] = spot_status
+                if spot_status:
+                    scores[spot_indx] = - \
+                        random.uniform(0, 1)  # Random score < 0
+                else:
+                    scores[spot_indx] = random.uniform(
+                        0, 1)  # Random score > 0
 
     if frame_nmr % step == 0:
         previous_frame = frame.copy()
 
     for spot_indx, spot in enumerate(spots):
         spot_status = spots_status[spot_indx]
+        score = scores[spot_indx]
         x1, y1, w, h = spots[spot_indx]
 
         if spot_status:
-            frame = cv2.rectangle(
-                frame, (x1, y1), (x1 + w, y1 + h), (0, 255, 0), 2)
+            color = (0, 255, 0)  # Green
         else:
-            frame = cv2.rectangle(
-                frame, (x1, y1), (x1 + w, y1 + h), (0, 0, 255), 2)
+            color = (0, 0, 255)  # Red
+
+        frame = cv2.rectangle(frame, (x1, y1), (x1 + w, y1 + h), color, 2)
+        cv2.putText(frame, f'{score:.2f}', (x1, y1 - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 3)
 
     cv2.rectangle(frame, (80, 20), (550, 80), (0, 0, 0), -1)
-    cv2.putText(frame, 'Available spots: {} / {}'.format(str(sum(spots_status)), str(len(spots_status))), (100, 60),
+    cv2.putText(frame, f'Available spots: {sum(spots_status)} / {len(spots_status)}', (100, 60),
                 cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
     cv2.namedWindow('frame', cv2.WINDOW_NORMAL)

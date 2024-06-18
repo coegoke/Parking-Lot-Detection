@@ -1,7 +1,9 @@
-import pickle
-
-import numpy as np
 import cv2
+from skimage.transform import resize
+import numpy as np
+import pickle
+import warnings
+warnings.filterwarnings("ignore")
 
 
 EMPTY = True
@@ -13,9 +15,9 @@ MODEL = pickle.load(open("xgb_model_new.pkl", "rb"))
 def empty_or_not(spot_bgr):
 
     flat_data = []
-    img_resized = cv2.resize(spot_bgr, (15, 15))
-    img_gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
-    flat_data.append(img_gray.flatten())
+    img_resized = resize(spot_bgr, (15, 15))
+    # img_gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
+    flat_data.append(img_resized.flatten())
     flat_data = np.array(flat_data)
 
     y_output = MODEL.predict(flat_data)
@@ -42,3 +44,19 @@ def get_parking_spots_bboxes(connected_components):
         slots.append([x1, y1, w, h])
 
     return slots
+
+
+def calc_diff(im1, im2):
+    return np.abs(np.mean(im1) - np.mean(im2))
+
+
+def get_video_and_mask():
+    video_choice = input("Enter the video number (1, 2, or 3): ")
+    if video_choice not in ['1', '2', '3']:
+        print("Invalid choice. Please enter 1, 2, or 3.")
+        return get_video_and_mask()
+
+    mask_path = f'data/parking_spot_box{video_choice}.png'
+    video_path = f'data/sourcevid{video_choice}.mp4'
+
+    return mask_path, video_path
