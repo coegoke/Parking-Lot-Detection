@@ -52,17 +52,10 @@ while cap.isOpened():
             spot = spots[spot_indx]
             x1, y1, w, h = spot
             spot_crop = frame[y1:y1 + h, x1:x1 + w, :]
-            spot_status = empty_or_not(spot_crop)
+            spot_status,proba_value = empty_or_not(spot_crop)
 
-            # Update the score only if the spot status changes
-            if spots_status[spot_indx] != spot_status:
-                spots_status[spot_indx] = spot_status
-                if spot_status:
-                    scores[spot_indx] = - \
-                        random.uniform(0, 1)  # Random score < 0
-                else:
-                    scores[spot_indx] = random.uniform(
-                        0, 1)  # Random score > 0
+            spots_status[spot_indx] = spot_status
+            scores[spot_indx] = proba_value
 
     if frame_nmr % step == 0:
         previous_frame = frame.copy()

@@ -9,7 +9,7 @@ warnings.filterwarnings("ignore")
 EMPTY = True
 NOT_EMPTY = False
 
-MODEL = pickle.load(open("xgb_model_new.pkl", "rb"))
+MODEL = pickle.load(open("svc.pkl", "rb"))
 
 
 def empty_or_not(spot_bgr):
@@ -21,11 +21,12 @@ def empty_or_not(spot_bgr):
     flat_data = np.array(flat_data)
 
     y_output = MODEL.predict(flat_data)
-
+    y_proba = MODEL.predict_proba(flat_data)[0][0]
+    y_proba = round(y_proba,5)
     if y_output == 0:
-        return EMPTY
+        return EMPTY,y_proba
     else:
-        return NOT_EMPTY
+        return NOT_EMPTY,y_proba
 
 
 def get_parking_spots_bboxes(connected_components):
